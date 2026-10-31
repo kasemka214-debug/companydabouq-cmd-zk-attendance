@@ -36,15 +36,19 @@ const ROOT = path.resolve(__dirname, '..', '..');
 
 /* ───────────────────────── الوسائط ───────────────────────── */
 
-const args = { env: '.env.production', check: false };
+const args = { env: '.env.production', check: false, from: null };
 
 for (let i = 2; i < process.argv.length; i++) {
     const x = process.argv[i];
     if (x === '--env') args.env = process.argv[++i];
+    else if (x === '--from') args.from = process.argv[++i];
     else if (x === '--check') args.check = true;
     else if (x === '--help' || x === '-h') {
         console.log('تهيئةُ بيانات الاتصال بقاعدة الإنتاج\n');
         console.log('  --env FILE   الملفُّ المكتوب (الافتراضي .env.production)');
+        console.log('  --from FILE  خذِ العنوانَ والمستخدمَ وكلمةَ المرور من ملفِّ');
+        console.log('               مشروعٍ آخرَ على هذا الجهاز، ولا تسأل إلا عن');
+        console.log('               اسم القاعدة — إن كان التطبيقان على خادمٍ واحد');
         console.log('  --check      جرِّب الموجودَ ولا تسأل');
         process.exit(0);
     } else { console.error('وسيطٌ غير معروف: ' + x); process.exit(2); }
@@ -202,10 +206,107 @@ async function probe(cfg) {
     } catch (e) {
         try { if (db) await db.end(); } catch { /* لا يعني */ }
 
-        return { ok: false, why: e.message };
+        /*
+         * **ورمزُ الخطأ يُقال ولو خلت الرسالة.**
+         *
+         * فـ`ETIMEDOUT` تأتي من mysql2 بلا نصٍّ أحياناً، فتخرج الرسالةُ
+         * «فشل:» ولا شيءَ بعدها — وصاحبُها لا يدري أمن كلمة المرور أم من
+         * الشبكة. وقد وقع.
+         */
+        const why = (e && e.message) ? e.message : (e && e.code ? e.code : 'سببٌ غيرُ معروف');
+
+        return { ok: false, why, code: e && e.code ? e.code : null };
     }
 }
 
+/**
+ * أعنوانُ الخادم خاصٌّ لا يُرى من خارج شبكته؟
+ *
+ * وهذا أكثرُ ما يُحيّر: البياناتُ صحيحةٌ تماماً، والقاعدةُ حيّةٌ يستعملها
+ * التطبيقُ المنشور، ومع ذلك ينتهي الوقتُ بلا جواب. والعلّةُ أن اسمَ
+ * الخادم يُترجَم إلى عنوانٍ في شبكةٍ خاصّة (`10.x` أو `172.16–31.x` أو
+ * `192.168.x`) — فهو يُرى من داخل المنصّة وحدَها.
+ *
+ * فيُقال ذلك صراحةً ويُقال علاجُه، بدل أن يُعاد النظرُ في كلمة مرورٍ
+ * ليس فيها عيب.
+ */
+async function privateHost(host) {
+    try {
+        const dns = require('dns').promises;
+        const addrs = await dns.lookup(host, { all: true });
+
+        /*
+         * **ويُفحص كلُّ فصيلةٍ على حدة.**
+         *
+         * فاسمُ خادم Laravel Cloud يُترجَم إلى عنوانَي IPv4 خاصّين
+         * (`10.x`) **وعنوانَي IPv6 عامّين**. فشرطُ «كلُّ العناوين خاصّة»
+         * لا يتحقّق أبداً، فيسكت الفحصُ عن العلّة وهي قائمة — وقد وقع.
+         *
+         * والذي يهمّ: أكلُّ عناوين IPv4 خاصّةٌ؟ فأكثرُ الأجهزة لا طريقَ
+         * لها إلى IPv6 أصلاً.
+         */
+        const v4 = addrs.filter(a => a.family === 4).map(a => a.address);
+        const v6 = addrs.filter(a => a.family === 6).map(a => a.address);
+
+        const hidden = v4.filter(ip => /^10\./.test(ip)
+            || /^192\.168\./.test(ip)
+            || /^172\.(1[6-9]|2\d|3[01])\./.test(ip));
+
+        if (v4.length === 0 || hidden.length !== v4.length) return null;
+
+        return { hidden, v6 };
+    } catch {
+        return null;
+    }
+}
+
+
+/**
+ * شرحُ سبب الفشل — بالعلاج لا بالعَرَض.
+ */
+async function explain(cfg, r) {
+    say('');
+
+    const hidden = await privateHost(cfg.DB_HOST);
+
+    if (hidden) {
+        say('  **وعنوانُ الخادم خاصٌّ لا يُرى من خارج شبكته.**');
+        say('  يُترجَم اسمُه إلى: ' + hidden.hidden.join('، '));
+        say('');
+        say('  فالبياناتُ صحيحةٌ والقاعدةُ حيّةٌ يستعملها تطبيقُك المنشور — لكنها');
+        say('  مغلقةٌ على شبكة Laravel Cloud، ولا تُرى من هذا الجهاز.');
+
+        if (hidden.v6.length) {
+            say('');
+            say('  ولها عنوانٌ عامٌّ من الجيل السادس (IPv6)، فإن كان لجهازك طريقٌ');
+            say('  إليه عمل الاتصالُ بلا تغييرٍ في اللوحة. وأكثرُ الشبكات لا طريقَ');
+            say('  لها إليه.');
+        }
+
+        say('');
+        say('  **والعلاج:** لوحةُ Laravel Cloud ← قاعدةُ البيانات ← فعّل الوصولَ');
+        say('  العامّ (Public access)، وقيّده بعنوان جهازك إن أمكن. ثم أعد التشغيل.');
+
+        return;
+    }
+
+    if (r.code === 'ETIMEDOUT' || r.code === 'ECONNREFUSED') {
+        say('  انتهى الوقتُ بلا جواب: القاعدةُ قد تكون نائمةً (Scale to zero)،');
+        say('  أو الوصولُ العامُّ مغلقٌ عنها، أو جدارُ شبكتك يحجب المنفذ 3306.');
+
+        return;
+    }
+
+    if (/Access denied/i.test(r.why)) {
+        say('  المستخدمُ أو كلمةُ المرور — والعنوانُ سليم.');
+
+        return;
+    }
+
+    if (/Unknown database/i.test(r.why)) {
+        say('  العنوانُ والمستخدمُ سليمان، واسمُ القاعدة خطأ.');
+    }
+}
 /* ───────────────────────── الكتابة ───────────────────────── */
 
 function write(cfg) {
@@ -235,17 +336,53 @@ function write(cfg) {
     fs.writeFileSync(envPath, body, { encoding: 'utf8' });
 }
 
-function readExisting() {
-    if (!fs.existsSync(envPath)) return null;
+function parseEnvFile(file) {
+    if (!fs.existsSync(file)) return null;
 
     const cfg = {};
 
-    for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
         const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*)$/);
         if (m) cfg[m[1]] = m[2].replace(/^["']|["']$/g, '').trim();
     }
 
     return cfg;
+}
+
+const readExisting = () => parseEnvFile(envPath);
+
+/**
+ * أخذُ العنوان والمستخدم وكلمة المرور من ملفِّ مشروعٍ آخرَ على هذا الجهاز.
+ *
+ * وعلّتُه أن صاحبَ البرنامج قد يكون له تطبيقان على **خادمِ قاعدةٍ واحد**
+ * في Laravel Cloud، فبياناتُ الاتصال واحدةٌ ولا يختلف إلا اسمُ القاعدة.
+ * فبدل أن يفتح لوحةً ويُنقّب عن قيمٍ هي عنده أصلاً، تُنسخ من ملفّه.
+ *
+ * **ولا تمرّ هذه القيمُ بأحدٍ غيره:** الأداةُ على جهازه تقرأ وتكتب،
+ * ولا تُطبع على الشاشة ولا تُرسَل. ويبقى الحارسُ قائماً — إن لم تكن
+ * القاعدةُ على ذلك الخادم فشل الاتصالُ ولم يُكتب شيء.
+ */
+function borrow(file) {
+    const abs = path.isAbsolute(file) ? file : path.resolve(ROOT, file);
+
+    const cfg = parseEnvFile(abs);
+
+    if (!cfg) return { ok: false, why: 'لا يوجد ملفٌّ في ' + abs };
+
+    const need = ['DB_HOST', 'DB_USERNAME', 'DB_PASSWORD'].filter(k => !cfg[k]);
+
+    if (need.length) return { ok: false, why: 'الملفُّ ناقصٌ: ' + need.join('، ') };
+
+    return {
+        ok: true,
+        abs,
+        cfg: {
+            DB_HOST: cfg.DB_HOST,
+            DB_PORT: cfg.DB_PORT || '3306',
+            DB_USERNAME: cfg.DB_USERNAME,
+            DB_PASSWORD: cfg.DB_PASSWORD,
+        },
+    };
 }
 
 /* ───────────────────────── المسار ───────────────────────── */
@@ -264,7 +401,11 @@ function readExisting() {
 
         rl.close();
 
-        if (!r.ok) { say('\n✗ فشل: ' + r.why); process.exit(1); }
+        if (!r.ok) {
+            say('\n✗ فشل: ' + r.why);
+            await explain(cfg, r);
+            process.exit(1);
+        }
 
         say('\n✓ الاتصالُ سليم — ' + r.tables.length + ' جدولاً في القاعدة.');
         process.exit(0);
@@ -286,13 +427,37 @@ function readExisting() {
         say('');
     }
 
+    let cfg = null;
+
     /*
-     * الرابطُ الكامل أوّلاً: لصقةٌ واحدةٌ أقلُّ خطأً من نقل خمسة حقولٍ
+     * `--from`: التطبيقان على خادمٍ واحد، فلا يُسأل إلا عن اسم القاعدة.
+     */
+    if (args.from) {
+        const b = borrow(args.from);
+
+        if (!b.ok) { say('✗ ' + b.why); rl.close(); process.exit(2); }
+
+        say('  سآخذ العنوانَ والمستخدمَ وكلمةَ المرور من:');
+        say('    ' + b.abs);
+        say('  ولن تُطبع هذه القيمُ ولا تُرسَل — تُقرأ وتُكتب على هذا الجهاز وحدَه.');
+        say('');
+
+        const name = await ask('  اسمُ قاعدة البصمة على ذلك الخادم : ');
+
+        if (!name) { say('\n✗ لا اسمَ قاعدة — لم يُكتب شيء.'); rl.close(); process.exit(2); }
+
+        cfg = Object.assign({}, b.cfg, { DB_DATABASE: name });
+
+        say('');
+    }
+
+    /*
+     * وإلّا فالرابطُ الكامل: لصقةٌ واحدةٌ أقلُّ خطأً من نقل خمسة حقولٍ
      * بالعين. ومن لم يكن عنده رابطٌ سُئل حقلاً حقلاً.
      */
-    const url = await ask('  ألصق رابطَ الاتصال إن كان عندك (mysql://…) — أو اتركه فارغاً للسؤال حقلاً حقلاً:\n  > ');
+    const url = cfg ? '' : await ask('  ألصق رابطَ الاتصال إن كان عندك (mysql://…) — أو اتركه فارغاً للسؤال حقلاً حقلاً:\n  > ');
 
-    let cfg = url ? parseUrl(url) : null;
+    if (!cfg) cfg = url ? parseUrl(url) : null;
 
     if (url && !cfg) {
         say('\n  لم أفهم هذا الرابط — أسألك حقلاً حقلاً.\n');
@@ -332,11 +497,8 @@ function readExisting() {
 
     if (!r.ok) {
         say('\n✗ تعذّر الاتصال: ' + r.why);
-        say('  لم يُكتب شيء. راجع القيمَ في لوحة Laravel Cloud وأعد المحاولة.');
-        say('');
-        say('  وإن كان العنوانُ صحيحاً والخطأُ «Access denied» فالمستخدمُ أو كلمةُ');
-        say('  المرور، وإن كان «timed out» فقد تكون القاعدةُ نائمةً (Scale to zero)');
-        say('  أو العنوانُ محجوبٌ عن جهازك.');
+        say('  لم يُكتب شيء.');
+        await explain(cfg, r);
         rl.close();
         process.exit(1);
     }
