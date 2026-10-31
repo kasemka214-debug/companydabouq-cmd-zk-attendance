@@ -139,7 +139,8 @@
         @can('raw.view')
             @if ($rejected->count())
                 <div class="card mt-3"><div class="card-body">
-                    <h2 class="h6 mb-3">اتصالاتٌ مردودة</h2>
+                    {{-- العنوانُ يذكر النافذةَ: لوحةٌ تقول «مردودة» عن ردٍّ قديمٍ تُنذر من علّةٍ زالت --}}
+                    <h2 class="h6 mb-3">اتصالاتٌ مردودة <span class="text-muted fw-normal small">— خلال يوم</span></h2>
                     <table class="table table-sm mb-0">
                         <thead><tr><th>الوقت</th><th>الرقم التسلسلي</th><th>السبب</th></tr></thead>
                         <tbody>
