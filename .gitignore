@@ -1,0 +1,16 @@
+/vendor
+/node_modules
+/public/storage
+/storage/*.key
+/storage/logs/*.log
+/.idea
+/.vscode
+.env
+.env.*
+!.env.example
+!.env.production.example
+.phpunit.result.cache
+/composer.phar
+
+# نسخُ القاعدة — لا تُدفع إلى GitHub بحال
+/storage/backups

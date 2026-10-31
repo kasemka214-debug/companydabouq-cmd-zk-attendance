@@ -1,0 +1,16 @@
+{
+    "name": "zk-attendance-db-tool",
+    "private": true,
+    "version": "1.0.0",
+    "description": "سحبُ قاعدة بيانات حضور البصمة كاملةً من Laravel Cloud — بلا mysqldump، وبمقاومةٍ للانقطاع",
+    "type": "commonjs",
+    "scripts": {
+        "pull": "node pull.js"
+    },
+    "dependencies": {
+        "mysql2": "^3.11.0"
+    },
+    "engines": {
+        "node": ">=18"
+    }
+}
