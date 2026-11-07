@@ -6,10 +6,6 @@
     use App\Support\Employment;
 @endphp
 
-@section('print_note')
-    {{ $rows->count() }} موظفاً — {{ Clock::stamp(now(), 'Y-m-d') }}
-@endsection
-
 @section('content')
 
 <div class="d-flex justify-content-between align-items-center mb-3">

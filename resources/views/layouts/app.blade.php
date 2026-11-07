@@ -128,9 +128,6 @@
         .pagination .page-link { min-width: 1.9rem; text-align: center; }
         nav[role="navigation"] p { font-size: .78rem; margin-bottom: 0; }
 
-        /* ترويسةُ الورقة — لا تُرى على الشاشة */
-        .print-head { display: none; }
-
         /* ═══ الطباعة ═══════════════════════════════════════════════════
          *
          * وقواعدُها هنا لا في كل صفحة: كانت كلُّ شاشةٍ تُطبع على حِدة
@@ -189,13 +186,6 @@
             a { text-decoration: none !important; color: #000 !important; }
 
             .alert { border: 1pt solid #666 !important; background: #fff !important; padding: 1.5mm 2mm !important; }
-
-            .print-head {
-                display: block !important;
-                border-bottom: 1.5pt solid #000;
-                margin-bottom: 2.5mm;
-                padding-bottom: 1.5mm;
-            }
         }
     </style>
     @stack('head')
@@ -277,22 +267,6 @@
 
 <main class="container-fluid py-3">
 
-    {{--
-        ترويسةُ الورقة — تظهر في الطباعة وحدَها.
-
-        فورقةٌ تخرج من الطابعة بلا اسمٍ ولا تاريخٍ لا يُعرف بعد شهرٍ ممّ
-        هي ولا متى طُبعت، وتُوضع في ملفٍّ فتصير شاهداً على غير ما فيه.
-    --}}
-    <div class="print-head d-flex justify-content-between align-items-end">
-        <div>
-            <strong>@yield('title', 'كشف')</strong>
-            @hasSection('print_note')<span> — @yield('print_note')</span>@endif
-        </div>
-        <div style="font-size: 8pt">
-            {{ config('app.name') }} ·
-            طُبع {{ \App\Support\Clock::stamp(now(), 'Y-m-d H:i') }}
-        </div>
-    </div>
 
     @if (session('ok'))
         <div class="alert alert-success alert-dismissible no-print">

@@ -6,10 +6,6 @@
     use App\Support\ClockJudge;
 @endphp
 
-@section('print_note')
-    {{ $rows->total() }} عملية — {{ Clock::stamp(now(), 'Y-m-d H:i') }}
-@endsection
-
 @section('content')
 
 <div class="d-flex justify-content-between align-items-center mb-3">

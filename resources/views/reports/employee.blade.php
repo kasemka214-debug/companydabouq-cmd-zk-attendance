@@ -33,12 +33,6 @@
     }
 @endphp
 
-@section('print_note')
-    @if ($person)
-        {{ $person['name'] ?? 'رقم '.$person['pin'] }} · {{ $site }} · {{ $from }} ← {{ $to }}
-    @endif
-@endsection
-
 @section('content')
 
 <div class="d-flex justify-content-between align-items-center mb-3">

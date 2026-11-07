@@ -6,13 +6,6 @@
     use App\Support\ClockJudge;
 @endphp
 
-@section('print_note')
-    {{ $event->device?->name }} ·
-    {{ $event->classLabel() }} ·
-    {{ $event->driftLabel() }} ·
-    نافذة {{ Clock::stamp($event->suspect_from) }} ← {{ $event->closed_at ? Clock::stamp($event->closed_at) : 'الآن' }}
-@endsection
-
 @section('content')
 
 <div class="d-flex justify-content-between align-items-center mb-3">

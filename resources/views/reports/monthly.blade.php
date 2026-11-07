@@ -10,18 +10,6 @@
                'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 @endphp
 
-{{--
-    ترويسةُ الورقة — وموضعُها بعد كتلة المتغيّرات أعلاه لا قبلها.
-
-    فالأقسامُ تُلتقط وهي تُقرأ سطراً سطراً، فلو سبقت تعريفَ المتغيّرات
-    لخرجت فارغةً على الورق وحدَه — ولا يظهر ذلك على الشاشة أبداً.
---}}
-@section('print_note')
-    {{ $months[$month] ?? '' }} {{ $year }} ·
-    {{ $calendar['working'] }} يوم دوام × {{ rtrim(rtrim(number_format($hours, 1), '0'), '.') }}
-    = {{ AttendanceGrid::hhmm($target, '0:00') }} ساعة مطلوبة
-@endsection
-
 @section('content')
 
 <div class="d-flex justify-content-between align-items-center mb-3">

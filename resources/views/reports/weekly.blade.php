@@ -9,12 +9,6 @@
     $names = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 @endphp
 
-@section('print_note')
-    {{ $from }} ← {{ $to }} ·
-    {{ $calendar['working'] }} يوم دوام × {{ rtrim(rtrim(number_format($hours, 1), '0'), '.') }}
-    = {{ AttendanceGrid::hhmm($target, '0:00') }} ساعة مطلوبة
-@endsection
-
 @section('content')
 
 <div class="d-flex justify-content-between align-items-center mb-3">
