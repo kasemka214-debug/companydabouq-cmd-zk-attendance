@@ -74,8 +74,18 @@
     @continue($people === [])
 
     <div class="card mb-3">
-        <div class="card-header bg-white">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h2 class="h6 mb-0"><i class="bi bi-geo-alt"></i> {{ $g['name'] }}</h2>
+
+            {{-- جدولُ الموقع ومطلوبُه: موقعان دوامُهما مختلفٌ لا يُقرأ رقمُهما واحداً --}}
+            @isset ($g['schedule'])
+                <span class="small text-muted">
+                    الدوام <span class="num">{{ $g['schedule']['start'] }}</span>
+                    ← <span class="num">{{ Carbon::parse($g['schedule']['start'])->addMinutes($g['schedule']['minutes'])->format('H:i') }}</span>
+                    · سماحٌ <span class="num">{{ $g['schedule']['grace'] }}</span> د
+                    · المطلوب <span class="num">{{ AttendanceGrid::hhmm($g['target'] ?? $target, '0:00') }}</span>
+                </span>
+            @endisset
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -96,7 +106,8 @@
                     </thead>
                     <tbody>
                     @foreach ($people as $i => $p)
-                        @php $diff = $p['total'] - $target; @endphp
+                        {{-- الفرقُ إلى مطلوب موقعه هو، لا إلى مطلوبٍ عامّ --}}
+                        @php $diff = $p['total'] - ($g['target'] ?? $target); @endphp
                         <tr>
                             <td class="num">{{ $i + 1 }}</td>
                             <td>

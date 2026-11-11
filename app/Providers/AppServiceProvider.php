@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\ClockEvent;
+use App\Services\ShiftWatch;
 use App\Models\User;
 use App\Support\Abilities;
 use Illuminate\Pagination\Paginator;
@@ -56,6 +57,13 @@ class AppServiceProvider extends ServiceProvider
                 60,
                 fn () => ClockEvent::query()->unacknowledged()->alarming()->count(),
             ));
+
+            /*
+             * وعدّادُ التأخّر مثلُه — غير أنه **لمن يملك شاشتَه وحدَه**:
+             * حسابُه يمرّ بنبضات أسبوعٍ كاملٍ في المواقع كلِّها، فلا يُحمَّل
+             * على من لا يرى العدّاد أصلاً. والخزنُ والمسحُ في `ShiftWatch`.
+             */
+            $view->with('shiftAlerts', auth()->user()?->can('notes.view') ? ShiftWatch::pending() : 0);
         });
     }
 }

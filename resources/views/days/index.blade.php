@@ -4,6 +4,7 @@
 @php
     use App\Services\DayBuilder;
     use App\Support\AbsenceJudge;
+    use App\Support\ShiftJudge;
 @endphp
 
 @section('content')
@@ -247,6 +248,33 @@
                                 <span class="badge {{ AbsenceJudge::badge($d['kind']) }}">
                                     {{ AbsenceJudge::label($d['kind']) }}
                                 </span>
+
+                                {{--
+                                    التأخّرُ والنقصُ إلى جانب الحالة، ومعهما بابُ
+                                    الجواب: شاشةُ التأخّر مفتوحةً على هذا اليوم
+                                    وصاحبه وحدَه. فمن رأى الرصدَ سأل «أبإذن؟»،
+                                    والجوابُ على بعد ضغطةٍ لا على بعد بحث.
+
+                                    وصفوفُ من لم يبصم لا رصدَ فيها، فالمفاتيحُ
+                                    تُقرأ بـ`??` — لا تُفترض موجودةً فيها.
+                                --}}
+                                @if (($d['late'] ?? 0) || ($d['short'] ?? 0))
+                                    <span class="d-block mt-1">
+                                        @if ($d['late'] ?? 0)
+                                            <span class="badge bg-danger">تأخّر {{ ShiftJudge::hhmm($d['late']) }}</span>
+                                        @endif
+                                        @if ($d['short'] ?? 0)
+                                            <span class="badge bg-warning text-dark">نقص {{ ShiftJudge::hhmm($d['short']) }}</span>
+                                        @endif
+                                        @can('notes.view')
+                                            <a class="no-print" style="font-size:.72rem"
+                                               href="{{ route('notes.index', [
+                                                    'from' => $d['work_date'], 'to' => $d['work_date'],
+                                                    'site_id' => $d['site_id'], 'pin' => $d['device_pin'],
+                                               ]) }}">الإذنُ والسبب</a>
+                                        @endcan
+                                    </span>
+                                @endif
 
                                 {{-- ويُسمّى الموقعُ لا رقمُه: «بصم في الجهراء» --}}
                                 @if ($d['at_site'])

@@ -285,8 +285,14 @@ class DayController extends Controller implements HasMiddleware
          *
          * فالغيابُ يُضمّ **هنا**، في هذا المتحكّم وحدَه.
          */
+        /*
+         * وحكمُ الدوام يحتاج اثنين: جداولَ المواقع — متى يبدأ الدوامُ وكم
+         * يطول — وتقويمَ المدّة، فما ليس يومَ دوامٍ لا يُحكم فيه بتأخّر.
+         */
+        $cal = Holiday::calendar($f['from'], $f['to']);
+
         $days = app(DayBuilder::class)
-            ->build($punches, Pin::lookup($f['site_id'] ?: null))
+            ->build($punches, Pin::lookup($f['site_id'] ?: null), Site::schedules(), $cal['dates'])
             ->map(fn (array $d) => $d + [
                 'kind'    => $d['complete'] ? AbsenceJudge::FULL : AbsenceJudge::PARTIAL,
                 'at_site' => null,

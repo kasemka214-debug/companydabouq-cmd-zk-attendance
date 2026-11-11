@@ -46,6 +46,8 @@ class Abilities
         'photos.delete'   => 'حذف صورة',
 
         'days.view'       => 'عرض كشف الأيام',
+        'notes.view'      => 'عرض شاشة التأخّر والانصراف',
+        'notes.manage'    => 'البتُّ في تأخّرٍ أو انصراف: إذنٌ وسببُه',
         'reports.view'    => 'عرض التقارير الأسبوعية والشهرية',
         'holidays.manage' => 'اختيار عطل الشهر',
 
@@ -72,7 +74,7 @@ class Abilities
         'ربط الأرقام' => ['pins.view', 'pins.create', 'pins.edit', 'pins.delete'],
         'النبضات'     => ['punches.view', 'punches.delete'],
         'الصور'       => ['photos.view', 'photos.delete'],
-        'الكشوف'      => ['days.view', 'reports.view', 'page.print'],
+        'الكشوف'      => ['days.view', 'notes.view', 'notes.manage', 'reports.view', 'page.print'],
         'العطل'       => ['holidays.manage'],
         'الساعة'      => ['clock.view', 'clock.ack'],
         'التشخيص'     => ['raw.view'],

@@ -234,6 +234,11 @@
                 @if ($item['route'] === 'clock.index' && ($clockAlerts ?? 0) > 0)
                     <span class="badge bg-warning text-dark num ms-auto">{{ $clockAlerts }}</span>
                 @endif
+
+                {{-- وعدّادُ التأخّر: ما رُصد في آخر أسبوعٍ ولم يُبتّ فيه — وهو الإشعار --}}
+                @if (($item['badge'] ?? false) && ($shiftAlerts ?? 0) > 0)
+                    <span class="badge bg-danger num ms-auto">{{ $shiftAlerts }}</span>
+                @endif
             </a>
         @endforeach
     @endforeach

@@ -121,7 +121,7 @@ class ReportController extends Controller implements HasMiddleware
             'to'       => $to,
             'siteId'   => $siteId,
             'pin'      => $pin,
-            'hours'    => (float) config('zk.daily_hours', 8),
+            'hours'    => $this->shiftFor($siteId)['minutes'] / 60,
         ]);
     }
 
@@ -192,8 +192,20 @@ class ReportController extends Controller implements HasMiddleware
             'from'     => $from,
             'to'       => $to,
             'siteId'   => $siteId,
-            'hours'    => (float) config('zk.daily_hours', 8),
+            'hours'    => $this->shiftFor($siteId)['minutes'] / 60,
         ];
+    }
+
+    /**
+     * جدولُ الدوام الذي يُقاس به رأسُ الكشف: جدولُ الموقع المختار، أو
+     * الافتراضُ العامّ إن كان الكشفُ لمواقعَ شتّى — ولكلِّ موقعٍ في الجدول
+     * مطلوبُه هو، فلا يُقاس موقعان دوامُهما مختلفٌ بمسطرةٍ واحدة.
+     */
+    private function shiftFor(?int $siteId): array
+    {
+        return $siteId
+            ? (Site::find($siteId)?->schedule() ?? Site::defaultSchedule())
+            : Site::defaultSchedule();
     }
 
     /** @return array{0: string, 1: string} */
@@ -289,8 +301,8 @@ class ReportController extends Controller implements HasMiddleware
                     $cells,
                     [
                         AttendanceGrid::hhmm($p['total'], '0:00'),
-                        AttendanceGrid::hhmm($built['target'], '0:00'),
-                        AttendanceGrid::hhmm($p['total'] - $built['target'], '0:00'),
+                        AttendanceGrid::hhmm($group['target'] ?? $built['target'], '0:00'),
+                        AttendanceGrid::hhmm($p['total'] - ($group['target'] ?? $built['target']), '0:00'),
                     ],
                 );
             }

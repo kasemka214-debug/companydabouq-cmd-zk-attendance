@@ -32,6 +32,23 @@
     </div>
 </div>
 
+{{--
+    ما رُصد ولم يُبتّ فيه: تنبيهٌ لا بطاقةٌ فارغة. فبطاقةٌ تقول «صفر»
+    في كل يومٍ لا تُقرأ، وسطرٌ أحمرُ يظهر حين يكون ثَمَّ خبرٌ يُقرأ.
+--}}
+@if ($shiftPending)
+    <div class="alert alert-danger d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <i class="bi bi-hourglass-split"></i>
+            <strong class="num">{{ $shiftPending }}</strong>
+            يوماً رُصد فيه تأخّرٌ أو انصرافٌ مبكّرٌ في آخر أسبوع، ولم يُكتب فيه إذنٌ ولا سبب.
+        </div>
+        <a href="{{ route('notes.index', ['state' => 'pending']) }}" class="btn btn-sm btn-outline-danger">
+            عرضُها والبتُّ فيها
+        </a>
+    </div>
+@endif
+
 @if ($orphans->count())
     {{--
         هذا أهمُّ تنبيهٍ في الشاشة: رقمٌ يبصم ولا اسمَ له يعني عاملاً

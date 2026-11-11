@@ -8,10 +8,12 @@ use App\Models\Pin;
 use App\Models\Punch;
 use App\Models\RawLog;
 use App\Models\Site;
+use App\Services\ShiftWatch;
 use App\Support\Clock;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class DashboardController extends Controller implements HasMiddleware
 {
@@ -91,8 +93,17 @@ class DashboardController extends Controller implements HasMiddleware
             ->limit(5)
             ->get();
 
+        /*
+         * ما رُصد من تأخّرٍ أو انصرافٍ مبكّرٍ في آخر أسبوعٍ ولم يُبتّ فيه.
+         *
+         * ولمن يملك شاشتَه وحدَه: حسابُه يمرّ بنبضات الأسبوع في المواقع
+         * كلِّها، فلا يُحمَّل على من لا يُسأل عنه. وهو مخزونٌ خمسَ دقائق.
+         */
+        $shiftPending = Gate::allows('notes.view') ? ShiftWatch::pending() : 0;
+
         return view('dashboard', [
             'clockEvents' => $clockEvents,
+            'shiftPending' => $shiftPending,
             'devices'     => $devices,
             'stats'       => $stats,
             'sites'       => Site::withCount('devices')->orderBy('name')->get(),

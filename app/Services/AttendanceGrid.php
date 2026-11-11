@@ -42,10 +42,18 @@ class AttendanceGrid
         bool $onlyActive = true,
         ?string $pin = null,
     ): array {
-        $calendar = Holiday::calendar($from, $to);
+        $calendar  = Holiday::calendar($from, $to);
+        $schedules = Site::schedules();
 
-        /* المطلوبُ بالدقائق — لا بالساعات — فالمقارنةُ كلُّها بالدقائق */
-        $target = (int) round($calendar['working'] * (float) config('zk.daily_hours', 8) * 60);
+        /*
+         * المطلوبُ بالدقائق — لا بالساعات — فالمقارنةُ كلُّها بالدقائق.
+         *
+         * وهو هنا مطلوبُ الكشف في جملته: جدولُ الموقع إن كان الكشفُ لموقعٍ
+         * واحد، وإلا فالافتراضُ العامّ. ولكلِّ موقعٍ في الجدول مطلوبُه هو
+         * (انظر `pivot`) — فموقعان دوامُهما مختلفٌ لا يُقاسان بمسطرةٍ واحدة.
+         */
+        $shift  = $siteId ? ($schedules[$siteId] ?? Site::defaultSchedule()) : Site::defaultSchedule();
+        $target = (int) round($calendar['working'] * $shift['minutes']);
 
         $punches = Punch::query()
             ->between($from, $to)
@@ -55,12 +63,12 @@ class AttendanceGrid
             ->get();
 
         $names = Pin::lookup($siteId);
-        $rows  = $this->days->build($punches, $names);
+        $rows  = $this->days->build($punches, $names, $schedules, $calendar['dates']);
 
         return [
             'calendar' => $calendar,
             'target'   => $target,
-            'groups'   => $this->pivot($rows, $siteId, $onlyActive, $pin, $from),
+            'groups'   => $this->pivot($rows, $siteId, $onlyActive, $pin, $from, (int) $calendar['working'], $schedules),
         ];
     }
 
@@ -76,6 +84,8 @@ class AttendanceGrid
         bool $onlyActive,
         ?string $pin = null,
         string $from = '0000-01-01',
+        int $working = 0,
+        array $schedules = [],
     ): array
     {
         $sites = Site::query()
@@ -166,6 +176,11 @@ class AttendanceGrid
                     'last'     => $row['last_time'],
                     'punches'  => $row['punches'],
                     'complete' => $row['complete'],
+
+                    /* حكمُ الدوام يُحمل مع الخلية — تُلوَّن به في التقرير */
+                    'late'     => $row['late'] ?? 0,
+                    'short'    => $row['short'] ?? 0,
+                    'flagged'  => $row['flagged'] ?? false,
                 ];
 
                 $people[$key]['total'] += $minutes;
@@ -174,10 +189,19 @@ class AttendanceGrid
             $people = array_values($people);
 
             if ($people !== []) {
+                $shift = $schedules[$site->id] ?? Site::defaultSchedule();
+
                 $out[] = [
-                    'site_id' => $site->id,
-                    'name'    => $site->name,
-                    'people'  => $people,
+                    'site_id'  => $site->id,
+                    'name'     => $site->name,
+                    'people'   => $people,
+
+                    /*
+                     * مطلوبُ هذا الموقع وحدَه — أيامُ الدوام في دقائق دوامه.
+                     * فمدرسةٌ دوامُها سبعُ ساعاتٍ لا يُقاس رجالُها بثماني.
+                     */
+                    'target'   => (int) round($working * $shift['minutes']),
+                    'schedule' => $shift,
                 ];
             }
         }

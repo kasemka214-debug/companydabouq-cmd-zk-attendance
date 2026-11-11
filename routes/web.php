@@ -5,6 +5,7 @@ use App\Http\Controllers\ClockController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\DayController;
+use App\Http\Controllers\DayNoteController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\PinController;
@@ -34,6 +35,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('days', [DayController::class, 'index'])->name('days.index');
     Route::get('days/export', [DayController::class, 'export'])->name('days.export');
+
+    Route::get('notes', [DayNoteController::class, 'index'])->name('notes.index');
+    Route::post('notes', [DayNoteController::class, 'store'])->name('notes.store');
+    Route::delete('notes/{note}', [DayNoteController::class, 'destroy'])->name('notes.destroy');
 
     Route::get('reports/weekly', [ReportController::class, 'weekly'])->name('reports.weekly');
     Route::get('reports/weekly/excel', [ReportController::class, 'weeklyExcel'])->name('reports.weekly.excel');
@@ -82,6 +87,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('sites', [SiteController::class, 'index'])->name('sites.index');
     Route::post('sites', [SiteController::class, 'store'])->name('sites.store');
+    Route::post('sites/schedule', [SiteController::class, 'applyAll'])->name('sites.schedule');
     Route::put('sites/{site}', [SiteController::class, 'update'])->name('sites.update');
     Route::delete('sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
 
