@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
     Route::get('days/export', [DayController::class, 'export'])->name('days.export');
 
     Route::get('notes', [DayNoteController::class, 'index'])->name('notes.index');
+    Route::get('notes/export', [DayNoteController::class, 'export'])->name('notes.export');
     Route::post('notes', [DayNoteController::class, 'store'])->name('notes.store');
     Route::delete('notes/{note}', [DayNoteController::class, 'destroy'])->name('notes.destroy');
 

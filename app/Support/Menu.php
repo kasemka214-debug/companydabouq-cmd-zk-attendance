@@ -38,7 +38,7 @@ class Menu
             ['route' => 'reports.employee', 'label' => 'تقرير موظف', 'ability' => 'reports.view', 'icon' => 'person-lines-fill', 'group' => 'reports'],
 
             /* وهذا وحدَه يحمل عدّاداً: ما رُصد ولم يُبتّ فيه — وهو الإشعار */
-            ['route' => 'notes.index', 'label' => 'التأخّر والانصراف', 'ability' => 'notes.view', 'icon' => 'hourglass-split', 'group' => 'reports', 'badge' => true],
+            ['route' => 'notes.index', 'label' => 'التأخّر والغياب', 'ability' => 'notes.view', 'icon' => 'hourglass-split', 'group' => 'reports', 'badge' => true],
 
             ['route' => 'punches.index', 'label' => 'النبضات', 'ability' => 'punches.view', 'icon' => 'fingerprint', 'group' => 'records'],
             ['route' => 'photos.index',  'label' => 'الصور',   'ability' => 'photos.view',  'icon' => 'camera',      'group' => 'records'],

@@ -12,6 +12,7 @@ use App\Services\ClockWatch;
 use App\Services\OperationParser;
 use App\Services\PhotoIntake;
 use App\Support\Clock;
+use App\Support\PollRhythm;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
@@ -83,7 +84,8 @@ class CdataController extends IclockController
             'ATTPHOTOStamp='.(config('zk.photos') ? $device->attphoto_stamp : '0'),
 
             'ErrorDelay='.(int) config('zk.error_delay', 60),
-            'Delay='.(int) config('zk.poll_delay', 30),
+            /* وتيرةُ اللحظة: نهارٌ أم ليل — فجهازٌ يُقلع ليلاً يبدأ هادئاً */
+            'Delay='.PollRhythm::delay(),
             'TransTimes=00:00;12:00',
             'TransInterval=1',
 

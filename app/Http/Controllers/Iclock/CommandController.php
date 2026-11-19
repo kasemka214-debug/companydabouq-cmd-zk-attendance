@@ -7,6 +7,7 @@ use App\Models\Device;
 use App\Models\Pin;
 use App\Services\AttlogParser;
 use App\Services\PhotoIntake;
+use App\Support\PollRhythm;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
@@ -35,6 +36,19 @@ class CommandController extends IclockController
         /** @var Device $device */
         $device = $request->attributes->get('zk_device');
 
+        /*
+         * وتيرةُ النداء تُضبط هنا لا بمُجدوِل.
+         *
+         * فالمُجدوِلُ عمليةٌ تعمل على الخادم وتُحاسَب عليه — وهو عينُ ما
+         * نحاول توفيره. والجهازُ نفسُه يُخبرنا أن الوقتَ حان: متى نادى بعد
+         * الخامسة وهو على وتيرة النهار حُمّل جوابُه أمرَ النوم، ومتى نادى
+         * بعد السادسة صباحاً وهو على وتيرة الليل حُمّل أمرَ الاستيقاظ.
+         *
+         * ويُكتب الأمرُ **قبل** سحب الطابور ليخرج في هذا الجواب نفسِه، لا
+         * في الذي بعده بنصف ساعة.
+         */
+        $this->tuneRhythm($device);
+
         $pending = Command::query()
             ->where('device_id', $device->id)
             ->where('status', 'pending')
@@ -55,6 +69,41 @@ class CommandController extends IclockController
         })->all();
 
         return $this->lines($lines);
+    }
+
+    /**
+     * أمرُ وتيرةٍ واحدٌ عند كل تحوّل — لا أمرٌ في كل نداء.
+     *
+     * والحالةُ تُكتب على الجهاز حين يُرسَل الأمر لا حين يُقرّ به: جهازٌ
+     * يعصي `Delay` لا يُغرَق بأمرٍ كلَّ نصف دقيقةٍ إلى الأبد. وإن لم يُطع
+     * رأيتَه في «سجلّ الاتصالات» صباحاً: نداءاتُه ما زالت كلَّ نصف دقيقة.
+     */
+    private function tuneRhythm(Device $device): void
+    {
+        if (! PollRhythm::enabled()) {
+            return;
+        }
+
+        $mode = PollRhythm::mode();
+
+        if ($device->poll_mode === $mode) {
+            return;
+        }
+
+        Command::create([
+            'device_id' => $device->id,
+            'kind'      => 'poll_delay',
+            'body'      => PollRhythm::body($mode),
+            'label'     => $mode === PollRhythm::NIGHT
+                ? 'إبطاءُ النداء في النافذة الهادئة'
+                : 'إعادةُ النداء إلى وتيرة النهار',
+            'status'    => 'pending',
+        ]);
+
+        $device->forceFill([
+            'poll_mode'    => $mode,
+            'poll_mode_at' => Carbon::now('UTC'),
+        ])->saveQuietly();
     }
 
     /**

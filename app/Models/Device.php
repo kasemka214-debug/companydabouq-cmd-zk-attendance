@@ -24,6 +24,7 @@ class Device extends Model
         'last_seen_at'     => 'datetime',
         'clock_checked_at' => 'datetime',
         'clock_good_at'    => 'datetime',
+        'poll_mode_at'     => 'datetime',
         'is_active'    => 'boolean',
     ];
 

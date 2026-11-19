@@ -62,7 +62,7 @@
         <table class="table table-sm align-middle mb-0">
             <thead><tr>
                 <th></th><th>الجهاز</th><th>الرقم التسلسلي</th><th>الموقع</th>
-                <th>الطراز</th><th>آخر عنوان</th><th>آخر اتصال</th><th>آخر بصمة</th><th>النبضات</th>
+                <th>الطراز</th><th>الوتيرة</th><th>آخر عنوان</th><th>آخر اتصال</th><th>آخر بصمة</th><th>النبضات</th>
             </tr></thead>
             <tbody>
             @forelse ($devices as $d)
@@ -77,13 +77,19 @@
                     <td class="mono">{{ $d->serial_number }}</td>
                     <td>{{ $d->site?->name ?? '—' }}</td>
                     <td class="small">{{ $d->model ?? '—' }}</td>
+
+                    {{--
+                        وتيرةُ ندائه الآن — بها يُعرف أطاع أمرَ النافذة
+                        الهادئة أم بقي ينادي كلَّ نصف دقيقةٍ ليلاً.
+                    --}}
+                    <td class="small text-muted">{{ \App\Support\PollRhythm::label($d->poll_mode) }}</td>
                     <td class="mono small">{{ $d->last_ip ?? '—' }}</td>
                     <td class="num small">{{ $d->lastSeenLabel() }}</td>
                     <td class="num small">{{ $s ? Clock::stamp($s->last_at) : '—' }}</td>
                     <td class="num">{{ number_format((int) ($s->total ?? 0)) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-center text-muted py-5">
+                <tr><td colspan="10" class="text-center text-muted py-5">
                     لا أجهزةَ بعد. أضف الجهازَ هنا برقمِه التسلسلي أوّلاً، ثم اضبط عنوانَ الخادم فيه.
                 </td></tr>
             @endforelse
