@@ -6,6 +6,7 @@ use App\Models\DayNote;
 use App\Models\Site;
 use App\Services\ShiftWatch;
 use App\Support\Clock;
+use App\Support\Employment;
 use App\Support\ShiftJudge;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -24,6 +25,10 @@ use Illuminate\Support\Collection;
  * **والصفوفُ مقسومةٌ على الأشخاص لا مسرودةٌ بالتاريخ.** فالسؤالُ الذي
  * يُسأل: «فلانٌ كم غاب وكم تأخّر؟» — لا «ماذا جرى يوم الثلاثاء». وسردٌ
  * بالتاريخ يُجبر قارئَه أن يجمع أيامَ الرجل بعينه من عشرة مواضع.
+ *
+ * **وتبويبان لا واحد**: «الاستثناءات» وهي ما يُسأل عنه ويُبتّ فيه،
+ * و«الإجازات المسجَّلة» وهي ما جوابُه مكتوبٌ سلفاً في ورقةٍ موقَّعة —
+ * وسببُ الفصل في `split()`.
  */
 class DayNoteController extends Controller implements HasMiddleware
 {
@@ -41,25 +46,37 @@ class DayNoteController extends Controller implements HasMiddleware
         $f = $this->filters($request);
 
         /* الرصدُ مرّةً واحدة — يمرّ بنبضات المدّة وبكشف الغياب، فلا يُكرَّر */
-        $all  = $watch->flagged($f['from'], $f['to'], $f['site_id'] ?: null, $f['pin']);
-        $rows = $this->sift($all, $f);
+        $all = $watch->flagged($f['from'], $f['to'], $f['site_id'] ?: null, $f['pin']);
+
+        [$leaves, $exceptions] = $this->split($all);
+
+        /* وعددُ التبويب الآخرِ يُحسب دائماً — الشارةُ على رأسه تقول ما فيه */
+        $base = $f['tab'] === 'leave' ? $leaves : $exceptions;
+        $rows = $this->sift($base, $f);
 
         return view('dayNotes.index', [
             'groups'  => $this->byPerson($rows),
             'sites'   => Site::orderBy('name')->get(),
             'f'       => $f,
-            'total'   => $all->count(),
+            'tabs'    => ['exceptions' => $exceptions->count(), 'leave' => $leaves->count()],
+            'total'   => $base->count(),
             'shown'   => $rows->count(),
-            'pending' => $all->filter(fn (array $r) => ShiftWatch::awaiting($r))->count(),
+            'pending' => $exceptions->filter(fn (array $r) => ShiftWatch::awaiting($r))->count(),
         ]);
     }
 
-    /** التصديرُ يتبع الشاشة: الترشيحُ نفسُه والترتيبُ نفسُه. */
+    /** التصديرُ يتبع الشاشة: التبويبُ نفسُه والترشيحُ نفسُه والترتيبُ نفسُه. */
     public function export(Request $request, ShiftWatch $watch)
     {
-        $f     = $this->filters($request);
-        $rows  = $this->sift($watch->flagged($f['from'], $f['to'], $f['site_id'] ?: null, $f['pin']), $f);
-        $sites = Site::pluck('name', 'id');
+        $f = $this->filters($request);
+
+        [$leaves, $exceptions] = $this->split(
+            $watch->flagged($f['from'], $f['to'], $f['site_id'] ?: null, $f['pin'])
+        );
+
+        $onLeave = $f['tab'] === 'leave';
+        $rows    = $this->sift($onLeave ? $leaves : $exceptions, $f);
+        $sites   = Site::pluck('name', 'id');
 
         $out = [];
         $n   = 0;
@@ -69,33 +86,51 @@ class DayNoteController extends Controller implements HasMiddleware
                 $note = $r['note'];
                 $n++;
 
-                $out[] = [
+                /* ستُّ خاناتٍ يشترك فيها التبويبان: من هو، وفي أيّ يوم */
+                $who = [
                     $n,
                     $sites[$r['site_id']] ?? '',
                     $r['employee'] ?? '— غير مربوط —',
                     $r['device_pin'],
                     $r['job_title'] ?? '',
                     $r['work_date'],
-                    ShiftWatch::kindLabel(ShiftWatch::kindOf($r)),
-                    $r['first_time'],
-                    $r['last_time'],
-                    $r['due_out'],
-                    $r['late'] ? ShiftJudge::hhmm($r['late']) : '',
-                    $r['short'] ? ShiftJudge::hhmm($r['short']) : '',
-                    $this->decisionLabel($r),
-                    $note?->reason ?? '',
-                    $note?->note ?? '',
-                    $note?->decider?->name ?? '',
                 ];
+
+                $out[] = $onLeave
+                    ? array_merge($who, [
+                        Employment::kind($r['leave']['kind'] ?? null),
+                        $r['leave']['from'] ?? '',
+                        $r['leave']['to'] ?? '',
+                    ])
+                    : array_merge($who, [
+                        ShiftWatch::kindLabel(ShiftWatch::kindOf($r)),
+                        $r['first_time'],
+                        $r['last_time'],
+                        $r['due_out'],
+                        $r['late'] ? ShiftJudge::hhmm($r['late']) : '',
+                        $r['short'] ? ShiftJudge::hhmm($r['short']) : '',
+                        $this->decisionLabel($r),
+                        $note?->reason ?? '',
+                        $note?->note ?? '',
+                        $note?->decider?->name ?? '',
+                    ]);
             }
         }
 
-        return $this->csv(
-            "الاستثناءات-{$f['from']}-إلى-{$f['to']}.csv",
-            ['م', 'الموقع', 'الموظف', 'الرقم', 'المسمّى', 'اليوم', 'النوع', 'الدخول', 'الخروج',
-                'المطلوب خروجاً', 'التأخّر', 'النقص', 'القرار', 'السبب', 'ملاحظة', 'من بتَّ'],
-            $out,
-        );
+        $who = ['م', 'الموقع', 'الموظف', 'الرقم', 'المسمّى', 'اليوم'];
+
+        return $onLeave
+            ? $this->csv(
+                "الإجازات-{$f['from']}-إلى-{$f['to']}.csv",
+                array_merge($who, ['نوعُ الإجازة', 'من', 'إلى']),
+                $out,
+            )
+            : $this->csv(
+                "الاستثناءات-{$f['from']}-إلى-{$f['to']}.csv",
+                array_merge($who, ['النوع', 'الدخول', 'الخروج', 'المطلوب خروجاً', 'التأخّر',
+                    'النقص', 'القرار', 'السبب', 'ملاحظة', 'من بتَّ']),
+                $out,
+            );
     }
 
     public function store(Request $request)
@@ -151,7 +186,29 @@ class DayNoteController extends Controller implements HasMiddleware
     /* ── المشترك ─────────────────────────────────────────────────────── */
 
     /**
+     * الإجازاتُ في كفّةٍ وما يُسأل عنه في كفّة.
+     *
+     * فالإجازةُ المسجَّلةُ ليست استثناءً يُنتظر فيه قرار — جوابُها مكتوبٌ
+     * سلفاً في ورقةٍ موقَّعة، وإنما تُعرض ليُعلم أن اليومَ محسوبٌ لا منسيّ.
+     * ومزجُها بالغياب يُثقل الورقةَ بما لا يُبتّ فيه، ويُوهم قارئَها أن على
+     * الرجل خمسةَ عشرَ استثناءً — وإنما عليه ثلاثةٌ وله اثنتا عشرةَ إجازةً
+     * بإذنٍ موقَّع.
+     *
+     * @param  Collection<int, array<string, mixed>>  $all
+     * @return array{0: Collection<int, array<string, mixed>>, 1: Collection<int, array<string, mixed>>}
+     */
+    private function split(Collection $all): array
+    {
+        $isLeave = fn (array $r) => ShiftWatch::kindOf($r) === 'leave';
+
+        return [$all->filter($isLeave)->values(), $all->reject($isLeave)->values()];
+    }
+
+    /**
      * الترشيحُ بعد الرصد: النوعُ والحالةُ صفتان محسوبتان لا عمودان يُستعلم بهما.
+     *
+     * **ولا يمرّ به تبويبُ الإجازات**: لا نوعَ يُسأل عنه فيه ولا حالةَ بتّ،
+     * و`filters()` تُطفئ المفتاحين هناك.
      *
      * @param  Collection<int, array<string, mixed>>  $rows
      * @return Collection<int, array<string, mixed>>
@@ -163,7 +220,7 @@ class DayNoteController extends Controller implements HasMiddleware
                 $kind = ShiftWatch::kindOf($r);
 
                 $byKind = match ($f['kind']) {
-                    'absent' => in_array($kind, ['absent', 'leave'], true),
+                    'absent' => $kind === 'absent',
                     'late'   => in_array($kind, ['late', 'both'], true),
                     'short'  => in_array($kind, ['short', 'both'], true),
                     default  => true,
@@ -171,7 +228,7 @@ class DayNoteController extends Controller implements HasMiddleware
 
                 $byState = match ($f['state']) {
                     'pending'   => ShiftWatch::awaiting($r),
-                    'permitted' => ($r['note'] ?? null)?->permitted === true || $kind === 'leave',
+                    'permitted' => ($r['note'] ?? null)?->permitted === true,
                     'denied'    => ($r['note'] ?? null)?->permitted === false,
                     default     => true,
                 };
@@ -229,10 +286,6 @@ class DayNoteController extends Controller implements HasMiddleware
 
     private function decisionLabel(array $row): string
     {
-        if (ShiftWatch::kindOf($row) === 'leave') {
-            return 'بإذن — إجازةٌ مسجَّلة';
-        }
-
         return $row['note']?->statusLabel() ?? 'لم يُبتّ فيه';
     }
 
@@ -247,15 +300,26 @@ class DayNoteController extends Controller implements HasMiddleware
             [$from, $to] = [$to, $from];
         }
 
+        /*
+         * والتبويبُ يَحكم على الترشيح: في تبويب الإجازات لا نوعَ يُسأل عنه
+         * ولا حالةَ بتّ، فيُطفأ المفتاحان صراحةً. وبغير هذا يحمل المستخدمُ
+         * معه `kind=absent` من التبويب الأوّل فتخرج صفحةٌ فارغةٌ بلا سببٍ
+         * ظاهر — وحقلا الترشيح مخفيّان هناك فلا يُرى من أين فرغت.
+         */
+        $tab = $request->input('tab') === 'leave' ? 'leave' : 'exceptions';
+
         return [
             'from'    => $from,
             'to'      => $to,
+            'tab'     => $tab,
             'site_id' => (int) $request->input('site_id', 0),
             'pin'     => trim((string) $request->input('pin', '')),
-            'state'   => in_array($request->input('state'), ['pending', 'permitted', 'denied'], true)
+            'state'   => $tab !== 'leave'
+                && in_array($request->input('state'), ['pending', 'permitted', 'denied'], true)
                 ? $request->input('state')
                 : 'all',
-            'kind'    => in_array($request->input('kind'), ['absent', 'late', 'short'], true)
+            'kind'    => $tab !== 'leave'
+                && in_array($request->input('kind'), ['absent', 'late', 'short'], true)
                 ? $request->input('kind')
                 : 'all',
         ];
